@@ -63,11 +63,8 @@ sub reapply_config
 
       my $config = $processes->{$name};
       my $collector = ProcessCollector->new(
-         collector => Net::Prometheus::ProcessCollector->new(
-            pid    => $config->{pid},
-            prefix => "exported_process",
-            labels => [ exported_job => $name ],
-         ),
+         name => $name,
+         pid  => $config->{pid},
       );
 
       say "Now watching $name(" . $config->{pid} . ")";
@@ -91,13 +88,22 @@ sub new
    my $class = shift;
    my %args = @_;
 
-   return bless { collector => $args{collector} }, $class;
+   return bless {
+      name => $args{name},
+      pid  => $args{pid},
+   }, $class;
 }
 
 sub collect
 {
    my $self = shift;
-   my $collector = $self->{collector};
+
+   my $collector = $self->{collector} //=
+      Net::Prometheus::ProcessCollector->new(
+         pid    => $self->{pid},
+         prefix => "exported_process",
+         labels => [ exported_job => $self->{name} ],
+      );
 
    my @metrics = $collector->collect;
 
