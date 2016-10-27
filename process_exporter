@@ -5,6 +5,7 @@ use warnings;
 use feature qw( say );
 
 use Getopt::Long;
+use IO::Async::Signal;
 use IO::Async::Loop;
 use Net::Async::HTTP::Server::PSGI;
 use Net::Prometheus 0.05;
@@ -22,7 +23,21 @@ my $loop = IO::Async::Loop->new;
 my $prometheus = Net::Prometheus->new;
 
 my %collectors_by_name;
-reload_config();
+reapply_config();
+
+$loop->add( IO::Async::Signal->new(
+   name => "HUP",
+   on_receipt => sub {
+      say "Reloading config due to SIGHUP";
+
+      eval { $CONFIG = YAML::LoadFile( $CONFIG_FILE ); 1 } or do {
+         say "Unable to load config - $@";
+         return;
+      };
+
+      reapply_config();
+   }
+) );
 
 my $server = Net::Async::HTTP::Server::PSGI->new(
    app => $prometheus->psgi_app
@@ -38,7 +53,7 @@ say "Listening for metrics on http://[::0]:" . $server->read_handle->sockport;
 
 $loop->run;
 
-sub reload_config
+sub reapply_config
 {
    # First create new watchers
    my $processes = $CONFIG->{processes};
