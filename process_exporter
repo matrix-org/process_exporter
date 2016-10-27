@@ -4,12 +4,18 @@ use strict;
 use warnings;
 use feature qw( say );
 
+use Getopt::Long;
 use IO::Async::Loop;
 use Net::Async::HTTP::Server::PSGI;
 use Net::Prometheus 0.05;
 use YAML;
 
-my $CONFIG = YAML::LoadFile( "process_exporter.yaml" );
+GetOptions(
+   'C|config-file=s' => \( my $CONFIG_FILE = "process_exporter.yaml" ),
+   'p|port=i'        => \( my $PORT = 9124 ),
+) or exit 1;
+
+my $CONFIG = YAML::LoadFile( $CONFIG_FILE );
 
 my $loop = IO::Async::Loop->new;
 
@@ -25,7 +31,7 @@ $loop->add( $server );
 
 $server->listen(
    socktype => "stream",
-   service  => "9124",
+   service  => $PORT,
 )->get;
 
 say "Listening for metrics on http://[::0]:" . $server->read_handle->sockport;
