@@ -62,10 +62,12 @@ sub reapply_config
       next if $collectors_by_name{$name};
 
       my $config = $processes->{$name};
-      my $collector = Net::Prometheus::ProcessCollector->new(
-         pid    => $config->{pid},
-         prefix => "exported_process",
-         labels => [ exported_job => $name ],
+      my $collector = ProcessCollector->new(
+         collector => Net::Prometheus::ProcessCollector->new(
+            pid    => $config->{pid},
+            prefix => "exported_process",
+            labels => [ exported_job => $name ],
+         ),
       );
 
       say "Now watching $name(" . $config->{pid} . ")";
@@ -80,4 +82,26 @@ sub reapply_config
       say "No longer watching $name";
       $prometheus->unregister( delete $collectors_by_name{$name} );
    }
+}
+
+package ProcessCollector;
+
+sub new
+{
+   my $class = shift;
+   my %args = @_;
+
+   return bless { collector => $args{collector} }, $class;
+}
+
+sub collect
+{
+   my $self = shift;
+   my $collector = $self->{collector};
+
+   my @metrics = $collector->collect;
+
+   return $collector->_make_metric( up => @metrics ? 1 : 0,
+      "gauge", "The value 1 if the exported process exists" ),
+      @metrics;
 }
