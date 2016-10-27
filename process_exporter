@@ -6,7 +6,7 @@ use feature qw( say );
 
 use IO::Async::Loop;
 use Net::Async::HTTP::Server::PSGI;
-use Net::Prometheus;
+use Net::Prometheus 0.05;
 use YAML;
 
 my $CONFIG = YAML::LoadFile( "process_exporter.yaml" );
