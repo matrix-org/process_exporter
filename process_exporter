@@ -89,6 +89,8 @@ sub reapply_config
 
 package ProcessCollector;
 
+use File::stat;
+
 sub new
 {
    my $class = shift;
@@ -107,7 +109,11 @@ sub pid
    defined( my $pidfile = $self->{pidfile} ) or
       return $self->{pid};
 
-   # TODO: cache
+   my $stat = stat( $pidfile );
+   return $self->{pid} if $stat and
+                          $stat->mtime and
+                          $stat->mtime == ( $self->{pidfile_mtime} // 0 );
+
    open my $fh, "<", $pidfile or return undef;
 
    my $pid = <$fh>; chomp $pid;
@@ -115,6 +121,7 @@ sub pid
    # Check if the PID is valid
    -e "/proc/$pid" or return undef;
 
+   $self->{pidfile_mtime} = stat( $fh )->mtime;
    return $self->{pid} = $pid;
 }
 
