@@ -2,14 +2,19 @@
 
 use strict;
 use warnings;
-use feature qw( say );
 
 use Getopt::Long;
 use IO::Async::Signal;
 use IO::Async::Loop;
 use Net::Async::HTTP::Server::PSGI;
 use Net::Prometheus 0.05;
+use POSIX qw( strftime );
 use YAML;
+
+sub printlog
+{
+   print strftime( "[%Y-%m-%d %H:%M:%S] ", localtime ), @_, "\n";
+}
 
 GetOptions(
    'C|config-file=s' => \( my $CONFIG_FILE = "process_exporter.yaml" ),
@@ -28,10 +33,10 @@ reapply_config();
 $loop->add( IO::Async::Signal->new(
    name => "HUP",
    on_receipt => sub {
-      say "Reloading config due to SIGHUP";
+      printlog "Reloading config due to SIGHUP";
 
       eval { $CONFIG = YAML::LoadFile( $CONFIG_FILE ); 1 } or do {
-         say "Unable to load config - $@";
+         printlog "Unable to load config - $@";
          return;
       };
 
@@ -49,7 +54,7 @@ $server->listen(
    service  => $PORT,
 )->get;
 
-say "Listening for metrics on http://[::0]:" . $server->read_handle->sockport;
+printlog "Listening for metrics on http://[::0]:" . $server->read_handle->sockport;
 
 $loop->run;
 
@@ -68,7 +73,7 @@ sub reapply_config
          pid     => $config->{pid},
       );
 
-      say "Now watching $name(" . ( $collector->pid // "??" ). ")";
+      printlog "Now watching $name(" . ( $collector->pid // "??" ). ")";
       $prometheus->register( $collectors_by_name{$name} = $collector );
    }
 
@@ -77,7 +82,7 @@ sub reapply_config
    foreach my $name ( keys %collectors_by_name ) {
       next if $processes->{$name};
 
-      say "No longer watching $name";
+      printlog "No longer watching $name";
       $prometheus->unregister( delete $collectors_by_name{$name} );
    }
 }
@@ -120,7 +125,7 @@ sub collect
    my $pid = $self->pid;
 
    if( defined $pid and defined $self->{last_pid} and $pid != $self->{last_pid} ) {
-      say "Process $self->{name} changed its pid to $pid";
+      ::printlog "Process $self->{name} changed its pid to $pid";
 
       undef $self->{collector};
       $self->{last_pid} = $pid;
