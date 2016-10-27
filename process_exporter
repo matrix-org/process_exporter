@@ -54,7 +54,7 @@ sub reload_config
       );
 
       say "Now watching $name(" . $config->{pid} . ")";
-      $prometheus->register( $collector );
+      $prometheus->register( $collectors_by_name{$name} = $collector );
    }
 
    # TODO: now reconfigure existing ones
