@@ -1,0 +1,62 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use feature qw( say );
+
+use IO::Async::Loop;
+use Net::Async::HTTP::Server::PSGI;
+use Net::Prometheus;
+use YAML;
+
+my $CONFIG = YAML::LoadFile( "process_exporter.yaml" );
+
+my $loop = IO::Async::Loop->new;
+
+my $prometheus = Net::Prometheus->new;
+
+my %collectors_by_name;
+reload_config();
+
+my $server = Net::Async::HTTP::Server::PSGI->new(
+   app => $prometheus->psgi_app
+);
+$loop->add( $server );
+
+$server->listen(
+   socktype => "stream",
+   service  => "9124",
+)->get;
+
+say "Listening for metrics on http://[::0]:" . $server->read_handle->sockport;
+
+$loop->run;
+
+sub reload_config
+{
+   # First create new watchers
+   my $processes = $CONFIG->{processes};
+
+   foreach my $name ( keys %$processes ) {
+      next if $collectors_by_name{$name};
+
+      my $config = $processes->{$name};
+      my $collector = Net::Prometheus::ProcessCollector->new(
+         pid    => $config->{pid},
+         prefix => "exported_process",
+         labels => [ exported_job => $name ],
+      );
+
+      say "Now watching $name(" . $config->{pid} . ")";
+      $prometheus->register( $collector );
+   }
+
+   # TODO: now reconfigure existing ones
+
+   foreach my $name ( keys %collectors_by_name ) {
+      next if $processes->{$name};
+
+      say "No longer watching $name";
+      $prometheus->unregister( delete $collectors_by_name{$name} );
+   }
+}
