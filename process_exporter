@@ -63,11 +63,12 @@ sub reapply_config
 
       my $config = $processes->{$name};
       my $collector = ProcessCollector->new(
-         name => $name,
-         pid  => $config->{pid},
+         name    => $name,
+         pidfile => $config->{pidfile},
+         pid     => $config->{pid},
       );
 
-      say "Now watching $name(" . $config->{pid} . ")";
+      say "Now watching $name(" . ( $collector->pid // "??" ). ")";
       $prometheus->register( $collectors_by_name{$name} = $collector );
    }
 
@@ -89,18 +90,47 @@ sub new
    my %args = @_;
 
    return bless {
-      name => $args{name},
-      pid  => $args{pid},
+      name    => $args{name},
+      pidfile => $args{pidfile},
+      pid     => $args{pid},
    }, $class;
+}
+
+sub pid
+{
+   my $self = shift;
+   defined( my $pidfile = $self->{pidfile} ) or
+      return $self->{pid};
+
+   # TODO: cache
+   open my $fh, "<", $pidfile or return undef;
+
+   my $pid = <$fh>; chomp $pid;
+
+   # Check if the PID is valid
+   -e "/proc/$pid" or return undef;
+
+   return $self->{pid} = $pid;
 }
 
 sub collect
 {
    my $self = shift;
 
+   my $pid = $self->pid;
+
+   if( defined $pid and defined $self->{last_pid} and $pid != $self->{last_pid} ) {
+      say "Process $self->{name} changed its pid to $pid";
+
+      undef $self->{collector};
+      $self->{last_pid} = $pid;
+   }
+
+   return unless defined $pid;
+
    my $collector = $self->{collector} //=
       Net::Prometheus::ProcessCollector->new(
-         pid    => $self->{pid},
+         pid    => $pid,
          prefix => "exported_process",
          labels => [ exported_job => $self->{name} ],
       );
