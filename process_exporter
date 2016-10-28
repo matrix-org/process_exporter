@@ -21,6 +21,7 @@ sub printlog
 GetOptions(
    'C|config-file=s' => \( my $CONFIG_FILE = "process_exporter.yaml" ),
    'p|port=i'        => \( my $PORT = 9124 ),
+   'pidfile=s'       => \my $PIDFILE,
 ) or exit 1;
 
 my $CONFIG = YAML::LoadFile( $CONFIG_FILE );
@@ -57,6 +58,12 @@ $server->listen(
 )->get;
 
 printlog "Listening for metrics on http://[::0]:" . $server->read_handle->sockport;
+
+if( defined $PIDFILE ) {
+   open my $pidfh, ">", $PIDFILE or
+      die "Unable to write pidfile $PIDFILE - $!";
+   $pidfh->print( "$$\n");
+}
 
 $loop->run;
 
