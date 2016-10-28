@@ -144,7 +144,7 @@ sub collect
       Net::Prometheus::ProcessCollector->new(
          pid    => $pid,
          prefix => "exported_process",
-         labels => [ exported_job => $self->{name} ],
+         labels => [ process_name => $self->{name} ],
       );
 
    my @metrics = $collector->collect;
