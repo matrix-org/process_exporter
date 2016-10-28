@@ -1,7 +1,11 @@
-# Export Metrics About External Processes
+# process_exporter
+
+*Export Metrics About External Processes*
 
 This prometheus-style metric exporter exposes the basic process-wide metrics
 about a pre-configured set of other processes to watch.
+
+## Configuration
 
 It is configured by a YAML file that gives names and ways to find external
 processes, most likely by reading a pidfile.
@@ -11,6 +15,16 @@ processes:
   my-server:
     pidfile: "/var/run/my-server.pid"
 
+```
+
+## Exported Metrics
+
+Process-wide metrics about the monitoring processes are exported under the
+`exported_process` name prefix, using a label called `process_name` whose value
+is the name given in the configuration file.
+
+```
+exported_process_cpu_seconds_total{process_name="my-server"} 1.234
 ```
 
 # See Also
