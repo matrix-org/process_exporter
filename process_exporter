@@ -11,6 +11,8 @@ use Net::Prometheus 0.05;
 use POSIX qw( strftime );
 use YAML;
 
+STDOUT->autoflush(1); # Disable block buffering in case of logging to regular file
+
 sub printlog
 {
    print strftime( "[%Y-%m-%d %H:%M:%S] ", localtime ), @_, "\n";
