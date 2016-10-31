@@ -5,6 +5,12 @@
 This prometheus-style metric exporter exposes the basic process-wide metrics
 about a pre-configured set of other processes to watch.
 
+This exporter does not require root privilege to run; however, there are are
+certain metrics it is unable to scrape about processes run by other users if
+it is not root. These are:
+
+ * ``process_open_fds``
+
 ## Configuration
 
 It is configured by a YAML file that gives names and ways to find external
