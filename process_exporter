@@ -100,6 +100,8 @@ package ProcessCollector;
 
 use File::stat;
 
+use Net::Prometheus::Types qw( MetricSamples Sample );
+
 sub new
 {
    my $class = shift;
@@ -147,18 +149,22 @@ sub collect
       $self->{last_pid} = $pid;
    }
 
-   return unless defined $pid;
+   my @metrics;
+   if( defined $pid ) {
+      my $collector = $self->{collector} //=
+         Net::Prometheus::ProcessCollector->new(
+            pid    => $pid,
+            prefix => "exported_process",
+            labels => [ process_name => $self->{name} ],
+         );
 
-   my $collector = $self->{collector} //=
-      Net::Prometheus::ProcessCollector->new(
-         pid    => $pid,
-         prefix => "exported_process",
-         labels => [ process_name => $self->{name} ],
-      );
+      @metrics = $collector->collect;
+   }
 
-   my @metrics = $collector->collect;
+   my $up_metric = MetricSamples( exported_process_up =>
+      "gauge", "The value 1 if the exported process exists",
+      [ Sample( exported_process_up => [ process_name => $self->{name} ],
+            @metrics ? 1 : 0 ) ] );
 
-   return $collector->_make_metric( up => @metrics ? 1 : 0,
-      "gauge", "The value 1 if the exported process exists" ),
-      @metrics;
+   return $up_metric, @metrics;
 }
