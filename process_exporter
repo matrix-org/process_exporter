@@ -73,20 +73,27 @@ sub reapply_config
    my $processes = $CONFIG->{processes};
 
    foreach my $name ( keys %$processes ) {
-      next if $collectors_by_name{$name};
-
       my $config = $processes->{$name};
-      my $collector = ProcessCollector->new(
-         name    => $name,
-         pidfile => $config->{pidfile},
-         pid     => $config->{pid},
-      );
 
-      printlog "Now watching $name(" . ( $collector->pid // "??" ). ")";
-      $prometheus->register( $collectors_by_name{$name} = $collector );
+      if( my $collector = $collectors_by_name{$name} ) {
+         $collector->configure(
+            pidfile => $config->{pidfile},
+            pid     => $config->{pid},
+         );
+
+         printlog "Still watching $name(" . ( $collector->pid // "??" ) . ")";
+      }
+      else {
+         my $collector = ProcessCollector->new(
+            name    => $name,
+            pidfile => $config->{pidfile},
+            pid     => $config->{pid},
+         );
+
+         printlog "Now watching $name(" . ( $collector->pid // "??" ). ")";
+         $prometheus->register( $collectors_by_name{$name} = $collector );
+      }
    }
-
-   # TODO: now reconfigure existing ones
 
    foreach my $name ( keys %collectors_by_name ) {
       next if $processes->{$name};
@@ -107,11 +114,21 @@ sub new
    my $class = shift;
    my %args = @_;
 
-   return bless {
-      name    => $args{name},
-      pidfile => $args{pidfile},
-      pid     => $args{pid},
+   my $self = bless {
+      name => delete $args{name},
    }, $class;
+
+   $self->configure( %args );
+
+   return $self;
+}
+
+sub configure
+{
+   my $self = shift;
+   my %args = @_;
+
+   $self->{$_} = $args{$_} for qw( pidfile pid );
 }
 
 sub pid
@@ -121,9 +138,8 @@ sub pid
       return $self->{pid};
 
    my $stat = stat( $pidfile );
-   return $self->{pid} if $stat and
-                          $stat->mtime and
-                          $stat->mtime == ( $self->{pidfile_mtime} // 0 );
+   return $self->{_cached_pid} if
+      $stat and $stat->mtime and $stat->mtime == ( $self->{_cached_pid_mtime} // 0 );
 
    open my $fh, "<", $pidfile or return undef;
 
@@ -132,8 +148,8 @@ sub pid
    # Check if the PID is valid
    -e "/proc/$pid" or return undef;
 
-   $self->{pidfile_mtime} = stat( $fh )->mtime;
-   return $self->{pid} = $pid;
+   $self->{_cached_pid_mtime} = stat( $fh )->mtime;
+   return $self->{_cached_pid} = $pid;
 }
 
 sub collect
