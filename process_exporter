@@ -162,11 +162,12 @@ sub collect
       ::printlog "Process $self->{name} changed its pid to $pid";
 
       undef $self->{collector};
-      $self->{last_pid} = $pid;
    }
 
    my @metrics;
    if( defined $pid ) {
+      $self->{last_pid} = $pid;
+
       my $collector = $self->{collector} //=
          Net::Prometheus::ProcessCollector->new(
             pid    => $pid,
