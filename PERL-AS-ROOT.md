@@ -31,5 +31,7 @@ cpan> o conf prefer_installer MB
 cpan> o conf commit
 
 cpan> install Module::Build
-cpan> ...
+cpan> ^D
+
+$ ./install-deps.pl
 ```
