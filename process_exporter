@@ -69,37 +69,25 @@ $loop->run;
 
 sub reapply_config
 {
-   # First create new watchers
-   my $processes = $CONFIG->{processes};
+   # Unregister all the watchers then start again
+   foreach my $collector ( values %collectors_by_name ) {
+      $prometheus->unregister( $collector );
+   }
 
+   %collectors_by_name = ();
+
+   my $processes = $CONFIG->{processes};
    foreach my $name ( keys %$processes ) {
       my $config = $processes->{$name};
 
-      if( my $collector = $collectors_by_name{$name} ) {
-         $collector->configure(
-            pidfile => $config->{pidfile},
-            pid     => $config->{pid},
-         );
+      my $collector = ProcessCollector->new(
+         name    => $name,
+         pidfile => $config->{pidfile},
+         pid     => $config->{pid},
+      );
 
-         printlog "Still watching $name(" . ( $collector->pid // "??" ) . ")";
-      }
-      else {
-         my $collector = ProcessCollector->new(
-            name    => $name,
-            pidfile => $config->{pidfile},
-            pid     => $config->{pid},
-         );
-
-         printlog "Now watching $name(" . ( $collector->pid // "??" ). ")";
-         $prometheus->register( $collectors_by_name{$name} = $collector );
-      }
-   }
-
-   foreach my $name ( keys %collectors_by_name ) {
-      next if $processes->{$name};
-
-      printlog "No longer watching $name";
-      $prometheus->unregister( delete $collectors_by_name{$name} );
+      printlog "Watching $name(" . ( $collector->pid // "??" ). ")";
+      $prometheus->register( $collectors_by_name{$name} = $collector );
    }
 }
 
@@ -114,21 +102,11 @@ sub new
    my $class = shift;
    my %args = @_;
 
-   my $self = bless {
-      name => delete $args{name},
-   }, $class;
-
-   $self->configure( %args );
-
-   return $self;
-}
-
-sub configure
-{
-   my $self = shift;
-   my %args = @_;
-
-   $self->{$_} = $args{$_} for qw( pidfile pid );
+   return bless {
+      name    => delete $args{name},
+      pidfile => delete $args{pidfile},
+      pid     => delete $args{pid},
+   };
 }
 
 sub pid
