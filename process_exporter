@@ -30,7 +30,7 @@ my $loop = IO::Async::Loop->new;
 
 my $prometheus = Net::Prometheus->new;
 
-my %collectors_by_name;
+my %collectors_by_desc;
 reapply_config();
 
 $loop->add( IO::Async::Signal->new(
@@ -70,23 +70,26 @@ $loop->run;
 sub reapply_config
 {
    # Unregister all the watchers then start again
-   foreach my $collector ( values %collectors_by_name ) {
+   foreach my $collector ( values %collectors_by_desc ) {
       $prometheus->unregister( $collector );
    }
 
-   %collectors_by_name = ();
+   %collectors_by_desc = ();
 
    my $processes = $CONFIG->{processes};
    foreach my $name ( keys %$processes ) {
-      my $config = $processes->{$name};
+      my $configs = $processes->{$name};
+      foreach my $config ( ref $configs eq "ARRAY" ? @$configs : ( $configs ) ) {
+         my $collector = ProcessCollector->new(
+            name => $name,
+            %$config,
+         );
 
-      my $collector = ProcessCollector->new(
-         name => $name,
-         %$config,
-      );
+         my $desc = $collector->desc;
 
-      printlog "Watching $name(" . ( $collector->pid // "??" ). ")";
-      $prometheus->register( $collectors_by_name{$name} = $collector );
+         printlog "Watching $desc(" . ( $collector->pid // "??" ). ")";
+         $prometheus->register( $collectors_by_desc{$desc} = $collector );
+      }
    }
 }
 
@@ -107,6 +110,17 @@ sub new
       pid     => delete $args{pid},
       labels  => delete $args{labels},
    };
+}
+
+sub desc
+{
+   my $self = shift;
+
+   return $self->{name} unless my $labels = $self->{labels};
+
+   return join "", $self->{name}, "{",
+      ( map { qq($_="$labels->{$_}") } sort keys %$labels ),
+      "}";
 }
 
 sub pid
