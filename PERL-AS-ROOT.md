@@ -23,11 +23,26 @@ $ . ./env.sh
 ```
 
 Then you can run `cpan` as normal, and it will install into this user-specific
-directory.
+directory. We'll start by configuring CPAN to prefer `Module::Build`
 
 ```sh
 $ cpan
 cpan> o conf prefer_installer MB
+```
+
+While we're at it, setting the default installation policy for build-time
+dependencies to `yes` will prevent it from asking us lots of questions during
+installation, which just makes the process more awkward.
+
+
+```sh
+cpan> o conf build_requires_install_policy yes
+```
+
+Now we can commit the config and install `Module::Build` specially, because
+will be required for actually installing the other things.
+
+```sh
 cpan> o conf commit
 
 cpan> install Module::Build
